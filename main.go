@@ -238,6 +238,7 @@ func main(){
 		default:
 			Err := fmt.Errorf("%w %s",ErrUnkownCmd, commands[0])
 			fmt.Println(Err.Error())
+			continue
 		}
 
 		end := time.Now()
