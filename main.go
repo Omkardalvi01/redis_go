@@ -2,12 +2,15 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"maps"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -15,13 +18,44 @@ var (
 	ErrUnkownCmd = errors.New("(error) Unkown command ")
 	ErrNokey = errors.New("(error) no such key")
 	ErrRegex = errors.New("(error) in the regex operation")
+	ErrInvalidDuration = errors.New("(error) duraion is invalid")
 )
+
+type TimeFormat int 
+const (
+	Milli TimeFormat = iota 
+	Second
+	UX_TF 
+	UX_TF_Milli
+)
+
+func expirefunc( kv_store *map[string]string, key string, t int, tf TimeFormat){
+
+	ctx := context.Background()
+	var cancel context.CancelFunc
+
+	switch tf{
+	case Second:
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(t)*time.Second)
+		defer cancel()
+
+	case Milli:
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(t)*time.Millisecond)
+		defer cancel()
+	
+	}
+
+	<-ctx.Done()
+	delete(*kv_store,key)	
+}
+
 func main(){
 	scanner := bufio.NewScanner(os.Stdin)
 	kv_store := make(map[string]string)
 	fmt.Println("Server Running")
 	exit_val := false
 
+	
 	for(!exit_val){
 		scanner.Scan()
 		if err := scanner.Err(); err != nil{
@@ -31,7 +65,7 @@ func main(){
 		line_command := string(scanner.Bytes())
 		commands := strings.Split(line_command, " ")
 
-		
+		start := time.Now()
 		switch  strings.ToLower(commands[0]) {
 		case "ping":
 			fmt.Println("PONG")
@@ -40,7 +74,7 @@ func main(){
 			if (len(commands) < 2 || commands[1] == ""){
 				Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 				fmt.Println(Err.Error())
-				continue
+				break
 			}
 			if _, ok := kv_store[commands[1]]; ok{
 				fmt.Println(kv_store[commands[1]])
@@ -52,7 +86,7 @@ func main(){
 			if len(commands) < 3 {
 				Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 				fmt.Println(Err.Error())
-				continue
+				break
 			}
 			kv_store[commands[1]] = commands[2]
 			fmt.Println("OK")
@@ -61,7 +95,7 @@ func main(){
 			if len(commands) < 2{
 				Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 				fmt.Println(Err.Error())
-				continue
+				break
 			}
 
 			count := 0
@@ -77,13 +111,13 @@ func main(){
 			if len(commands) != 2 {
 				Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 				fmt.Println(Err.Error())
-				continue
+				break
 			}
 
 			if len(commands) < 2 {
 				Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 				fmt.Println(Err.Error())
-				continue
+				break
 			}
 
 			count := 0
@@ -98,7 +132,7 @@ func main(){
 			if len(commands) != 1 {
 				Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 				fmt.Println(Err.Error())
-				continue
+				break
 			}
 			fmt.Printf("(integer) %d\n", len(kv_store))
 		
@@ -106,7 +140,7 @@ func main(){
 			if len(commands) != 2 {
 				Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 				fmt.Println(Err.Error())
-				continue
+				break
 			}
 
 			count := 1
@@ -116,14 +150,14 @@ func main(){
 					fmt.Printf("%d) %s\n",count,key)
 					count++
 				}
-				continue
+				break
 			}
 
 			if strings.Count(commands[1], "*") == 0{
 				if _, ok := kv_store[commands[1]]; ok{
 					fmt.Printf("%d) %s\n",count,commands[1])
 				}
-				continue
+				break
 			}
 
 			regex_str := commands[1]
@@ -140,7 +174,7 @@ func main(){
 				if err != nil{
 					Err := fmt.Errorf("%w caused due to %w while finding %s", ErrRegex, err, key)
 					fmt.Println(Err)
-					continue
+					break
 				}
 				if match {
 					matched_str = append(matched_str, key)
@@ -161,27 +195,54 @@ func main(){
 			if len(commands) != 3{
 				Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 				fmt.Println(Err.Error())
-				continue
+				break
 			}
 
 			val , ok := kv_store[commands[1]]
 			if !ok {
 				fmt.Println(ErrNokey.Error())
-				continue
+				break
 			}
 
 			delete(kv_store, commands[1])
 			kv_store[commands[2]] = val 
 			fmt.Println("OK")
+		
+		
+		case "expire", "pexpire":
+			if len(commands) != 3{
+				Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
+				fmt.Println(Err.Error())
+				break
+			}
+
+			duration, err := strconv.Atoi(commands[2])
+			if err != nil {
+				Err := fmt.Errorf("%w because %w",ErrInvalidDuration, err)
+				fmt.Println(Err)
+				break
+			}
+
+			if (commands[1] == "expire"){
+				go expirefunc(&kv_store, commands[1], duration, Second)
+			}else{
+				go expirefunc(&kv_store, commands[1], duration, Milli)
+			}
+			
 
 		case "exit":
 			fmt.Printf("OK")
 			exit_val=true
+			continue
 
 		default:
 			Err := fmt.Errorf("%w %s",ErrUnkownCmd, commands[0])
 			fmt.Println(Err.Error())
 		}
+
+		end := time.Now()
+		elapsed := end.Sub(start)
+		fmt.Printf("%v microseconds \n",elapsed.Microseconds())
 	}
 	
 }
