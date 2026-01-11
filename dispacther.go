@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 )
 
-func dispatcher(commands []string, kv_store *store) bool{
+func dispatcher(commands []string, mode Mode, kv_store *store) bool{
 
 	switch strings.ToLower(commands[0]) {
 	
@@ -13,13 +14,25 @@ func dispatcher(commands []string, kv_store *store) bool{
 		fmt.Println("PONG")
 		
 	case "set":
-		err := setFunction(commands)	
+		err := setFunction(commands)
+		if mode == FILE{
+			if err != nil{
+				fmt.Println(err.Error())
+				break 
+			}	
+			kv_store.kv_pair[commands[1]] = commands[2]
+			return true
+		}	
 		if err != nil{
 			fmt.Println(err.Error())
 			break 
 		}	
 		kv_store.kv_pair[commands[1]] = commands[2]
 		fmt.Println("OK")
+		if err = writeLog(commands); err != nil{
+			log.Fatal(err)
+		}
+		
 	
 	case "get":
 		val, present, err := getFunction(commands, kv_store.kv_pair)
@@ -35,13 +48,21 @@ func dispatcher(commands []string, kv_store *store) bool{
 	
 	case "del":
 		delKeys, err := deleteFunction(commands, kv_store.kv_pair)
+		if mode == FILE{
+			if err != nil{
+				fmt.Println(err.Error())
+				break 
+			}	
+			for _, val := range delKeys {
+				delete(kv_store.kv_pair, val)
+			}
+			return true
+		}	
 		if err != nil {
 			fmt.Println(err.Error())
 			break
 		}
-		for _, val := range delKeys {
-			delete(kv_store.kv_pair, val)
-		}
+		writeLog(commands)
 		fmt.Printf("(integer) %d\n", len(delKeys))
 	
 	case "exist":
@@ -54,10 +75,20 @@ func dispatcher(commands []string, kv_store *store) bool{
 
 	case "rename":
 		val, err := renameFunction(commands, kv_store.kv_pair)
+		if mode == FILE{
+			if err != nil{
+				fmt.Println(err.Error())
+				break 
+			}	
+			delete(kv_store.kv_pair, commands[1])
+			kv_store.kv_pair[commands[2]] = val 
+			return true
+		}	
 		if err != nil {
 			fmt.Println(err.Error())
 			break
 		}
+		writeLog(commands)
 		delete(kv_store.kv_pair, commands[1])
 		kv_store.kv_pair[commands[2]] = val 
 		fmt.Println("OK")

@@ -76,7 +76,7 @@ func renameFunction(commands []string, kv_store map[string]string) (string, erro
 	if !ok {
 		return "", ErrNokey
 	}
-
+	
 	return val, nil 
 }
 

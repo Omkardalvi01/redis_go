@@ -14,6 +14,13 @@ type store struct{
 	kv_pair map[string]string
 }
 
+type Mode int 
+const (
+	CLI Mode = iota
+	FILE 
+	SERVER 
+)
+
 func main(){
 	scanner := bufio.NewScanner(os.Stdin)
 	mappings := make(map[string]string)
@@ -24,7 +31,7 @@ func main(){
 
 
 	fmt.Println("Server Running")
-	
+	ingestionfunc(&kv_store)
 
 	
 	for(!exit_val){
@@ -35,7 +42,7 @@ func main(){
 		}
 
 		start := time.Now()
-		exit_val = dispatcher(commands, &kv_store)
+		exit_val = dispatcher(commands, CLI, &kv_store)
 		end := time.Now()
 		elapsed := end.Sub(start)
 		fmt.Printf("%v microseconds \n",elapsed.Microseconds())

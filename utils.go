@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"os"
 	"strings"
 	"time"
 )
@@ -47,10 +48,38 @@ func takeInput(scanner *bufio.Scanner) ([]string, error){
 	line_command_trimmed := strings.TrimRight(line_command, " ")
 	commands := strings.Split(line_command_trimmed, " ")
 
-	// for i, str := range commands{
-	// 	commands[i] = strings.TrimSpace(str)
-	// }
-
 	return commands, nil 
 
+}
+
+func writeLog(commands []string) (error) {
+	f, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	cmd := strings.Join(commands, " ")
+	_, err = f.WriteString(cmd + "\n")
+	if err != nil {
+		return err
+	}
+	return nil 
+}
+
+func ingestionfunc(kv_store *store) (error) {
+	f, err := os.OpenFile("log.txt", os.O_RDONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan(){
+		cmd_line := scanner.Text()
+		commands := strings.Split(cmd_line, " ")
+		dispatcher(commands, FILE, kv_store)
+	}
+	
+	return nil
 }
