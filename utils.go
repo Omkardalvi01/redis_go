@@ -74,11 +74,12 @@ func ingestionfunc(kv_store *store) (error) {
 	}
 	defer f.Close()
 
+	AOF_mode := true
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan(){
 		cmd_line := scanner.Text()
 		commands := strings.Split(cmd_line, " ")
-		dispatcher(commands, FILE, kv_store)
+		_, AOF_mode = dispatcher(commands, FILE, kv_store, AOF_mode)
 	}
 	
 	return nil

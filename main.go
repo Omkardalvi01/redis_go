@@ -27,7 +27,7 @@ func main(){
 	kv_store := store{}
 	kv_store.kv_pair = mappings
 	exit_val := false
-	
+	AOF_mode := true
 
 
 	fmt.Println("Server Running")
@@ -42,7 +42,7 @@ func main(){
 		}
 
 		start := time.Now()
-		exit_val = dispatcher(commands, CLI, &kv_store)
+		exit_val, AOF_mode = dispatcher(commands, CLI, &kv_store, AOF_mode)
 		end := time.Now()
 		elapsed := end.Sub(start)
 		fmt.Printf("%v microseconds \n",elapsed.Microseconds())

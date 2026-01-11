@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func dispatcher(commands []string, mode Mode, kv_store *store) bool{
+func dispatcher(commands []string, mode Mode, kv_store *store, valid_append bool) (bool, bool){
 
 	switch strings.ToLower(commands[0]) {
 	
@@ -14,25 +14,28 @@ func dispatcher(commands []string, mode Mode, kv_store *store) bool{
 		fmt.Println("PONG")
 		
 	case "set":
-		err := setFunction(commands)
-		if mode == FILE{
-			if err != nil{
+		if err := setFunction(commands); err != nil{
+			if mode == FILE{
+				log.Fatalln(err)
+			}else{
 				fmt.Println(err.Error())
-				break 
-			}	
-			kv_store.kv_pair[commands[1]] = commands[2]
-			return true
-		}	
-		if err != nil{
-			fmt.Println(err.Error())
-			break 
-		}	
-		kv_store.kv_pair[commands[1]] = commands[2]
-		fmt.Println("OK")
-		if err = writeLog(commands); err != nil{
-			log.Fatal(err)
+			}
+			break
 		}
 		
+		kv_store.kv_pair[commands[1]] = commands[2]
+		if mode != FILE{
+			fmt.Println("OK")
+
+			if valid_append {
+				if err := writeLog(commands); err != nil{
+					fmt.Println(err.Error())
+					fmt.Println("AOF disabled")
+					return true, false 
+				}
+			}
+			
+		}
 	
 	case "get":
 		val, present, err := getFunction(commands, kv_store.kv_pair)
@@ -48,22 +51,29 @@ func dispatcher(commands []string, mode Mode, kv_store *store) bool{
 	
 	case "del":
 		delKeys, err := deleteFunction(commands, kv_store.kv_pair)
-		if mode == FILE{
-			if err != nil{
-				fmt.Println(err.Error())
-				break 
-			}	
-			for _, val := range delKeys {
-				delete(kv_store.kv_pair, val)
-			}
-			return true
+		if err != nil && mode == FILE{
+			log.Fatalln(err)
+			break 
 		}	
 		if err != nil {
 			fmt.Println(err.Error())
 			break
 		}
-		writeLog(commands)
-		fmt.Printf("(integer) %d\n", len(delKeys))
+		for _, val := range delKeys {
+			delete(kv_store.kv_pair, val)
+		}
+
+		if mode != FILE{
+			fmt.Printf("(integer) %d\n", len(delKeys))
+			if valid_append {
+				if err := writeLog(commands); err != nil{
+					fmt.Println(err.Error())
+					fmt.Println("AOF disabled")
+					return true, false 
+				}
+			}
+		}
+
 	
 	case "exist":
 		count, err := existFunction(commands, kv_store.kv_pair)
@@ -75,23 +85,28 @@ func dispatcher(commands []string, mode Mode, kv_store *store) bool{
 
 	case "rename":
 		val, err := renameFunction(commands, kv_store.kv_pair)
-		if mode == FILE{
-			if err != nil{
-				fmt.Println(err.Error())
-				break 
-			}	
-			delete(kv_store.kv_pair, commands[1])
-			kv_store.kv_pair[commands[2]] = val 
-			return true
+		if err != nil && mode == FILE{
+			log.Fatalln(err)
+			break 
 		}	
 		if err != nil {
 			fmt.Println(err.Error())
 			break
 		}
-		writeLog(commands)
 		delete(kv_store.kv_pair, commands[1])
 		kv_store.kv_pair[commands[2]] = val 
-		fmt.Println("OK")
+		
+		if mode != FILE{
+			fmt.Println("OK")
+			if valid_append {
+				if err := writeLog(commands); err != nil{
+					fmt.Println(err.Error())
+					fmt.Println("AOF disabled")
+					return true, false 
+				}
+			}
+		}
+
 	
 	case "empty":
 		val, err := emptyFunction(commands, kv_store.kv_pair)
@@ -126,14 +141,14 @@ func dispatcher(commands []string, mode Mode, kv_store *store) bool{
 
 	case "exit":
 		fmt.Println("OK")
-		return true  
+		return true, true  
 	
 	default:
 	Err := fmt.Errorf("%w %s",ErrUnknownCmd, commands[0])
 	fmt.Println(Err.Error())
 	}
 
-	return false
+	return false, true
 
 
 }
