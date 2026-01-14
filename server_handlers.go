@@ -1,16 +1,21 @@
 package main
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+	"strings"
+)
 
 func handler(w http.ResponseWriter, r *http.Request){
-	commands := r.URL.Query()["cmd"]
+	params := r.URL.Query()["cmd"][0]
+	commands := strings.Split(params, " ")
 	p := dispatcher(commands, SERVER, &KV_store, true)
 	if p.err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(p.err.Error()))
+		fmt.Fprintf(w, p.err.Error())
 	}else{
 		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte(p.resp))
+		fmt.Fprintf(w, p.resp)
 	}
 	
 }

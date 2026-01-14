@@ -135,7 +135,7 @@ func expireFunction (commands []string, kv_store *store) (error){
 		return Err 
 	}
 
-	if (commands[1] == "expire"){
+	if (commands[0] == "expire"){
 		go delayedDel(kv_store, commands[1], duration, Second)
 	}else{
 		go delayedDel(kv_store, commands[1], duration, Milli)
