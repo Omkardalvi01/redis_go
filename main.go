@@ -13,6 +13,7 @@ type store struct{
 	mu sync.Mutex
 	kv_pair map[string]string
 }
+var KV_store = store{}
 
 type Mode int 
 const (
@@ -21,28 +22,43 @@ const (
 	SERVER 
 )
 
+type payload struct{
+	run bool
+	aof_mode bool 
+	resp string
+	err error 
+}
+
 func main(){
 	scanner := bufio.NewScanner(os.Stdin)
 	mappings := make(map[string]string)
-	kv_store := store{}
-	kv_store.kv_pair = mappings
-	exit_val := false
-	AOF_mode := true
-
+	KV_store.kv_pair = mappings
+	var r payload 
+	r.aof_mode = true
+	r.run = true 
 
 	fmt.Println("Server Running")
-	ingestionfunc(&kv_store)
+	ingestionFunc(&KV_store)
 
-	
-	for(!exit_val){
-		
+	for(!r.run){
+
+		r.err = nil 
+		r.resp = ""
 		commands, err := takeInput(scanner)
 		if err != nil{
 			log.Fatal(err.Error())
 		}
 
 		start := time.Now()
-		exit_val, AOF_mode = dispatcher(commands, CLI, &kv_store, AOF_mode)
+
+		r = dispatcher(commands, CLI, &KV_store, r.aof_mode)
+		if r.resp != ""{
+			fmt.Println(r.resp)
+		}
+		if r.err != nil{
+			fmt.Println(r.err.Error())
+		}
+		
 		end := time.Now()
 		elapsed := end.Sub(start)
 		fmt.Printf("%v microseconds \n",elapsed.Microseconds())

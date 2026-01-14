@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -67,20 +68,30 @@ func writeLog(commands []string) (error) {
 	return nil 
 }
 
-func ingestionfunc(kv_store *store) (error) {
+func ingestionFunc(kv_store *store) (error) {
 	f, err := os.OpenFile("log.txt", os.O_RDONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	AOF_mode := true
+	AOF_mode := false
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan(){
 		cmd_line := scanner.Text()
 		commands := strings.Split(cmd_line, " ")
-		_, AOF_mode = dispatcher(commands, FILE, kv_store, AOF_mode)
+		dispatcher(commands, FILE, kv_store, AOF_mode)
 	}
 	
 	return nil
 }
+
+func Append(cmds []string) (error){
+	if err := writeLog(cmds); err != nil{
+		Err := fmt.Errorf("AOF disabled due to %w", err)
+		return Err  
+	}
+	return nil
+}
+
+
