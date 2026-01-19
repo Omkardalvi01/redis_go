@@ -18,6 +18,7 @@ var (
 )
 
 func setFunction(commands []string) error {
+	
 	if len(commands) != 3 {
 		Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 		return Err
@@ -25,17 +26,22 @@ func setFunction(commands []string) error {
 	return nil
 }
 
-func getFunction(commands []string, kv_store map[string]string) (string, bool, error) {
+func getFunction(commands []string, kv_store *store) (string, bool, error) {
+	kv_store.mu.RLock()
+	defer kv_store.mu.RUnlock()
+
 	if (len(commands) != 2){
 		Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 		return "" , false, Err
 	}
-
-	val, ok := kv_store[commands[1]]
+	val, ok := kv_store.kv_pair[commands[1]]
 	return val, ok, nil
 }
 
-func deleteFunction(commands []string, kv_store map[string]string) ([]string, error){
+func deleteFunction(commands []string, kv_store *store) ([]string, error){
+	kv_store.mu.RLock()
+	defer kv_store.mu.RUnlock()
+
 	delKeys := make([]string, 0)
 	if len(commands) < 2{
 				Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
@@ -44,14 +50,16 @@ func deleteFunction(commands []string, kv_store map[string]string) ([]string, er
 
 
 	for i := 1; i < len(commands); i++ {
-		if _ , ok := kv_store[commands[i]]; ok{
+		if _ , ok := kv_store.kv_pair[commands[i]]; ok{
 			delKeys = append(delKeys, commands[i])
 		}
 	}
 	return delKeys, nil 
 }
 
-func existFunction(commands []string, kv_store map[string]string) (int, error){
+func existFunction(commands []string, kv_store *store) (int, error){
+	kv_store.mu.RLock()
+	defer kv_store.mu.RUnlock()
 	if len(commands) < 2 {
 		Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 		return 0, Err 
@@ -59,20 +67,22 @@ func existFunction(commands []string, kv_store map[string]string) (int, error){
 
 	count := 0
 	for i := 1; i < len(commands); i++ {
-		if _ , ok := kv_store[commands[i]]; ok {
+		if _ , ok := kv_store.kv_pair[commands[i]]; ok {
 			count++
 		}
 	}
 	return count, nil 
 }
 
-func renameFunction(commands []string, kv_store map[string]string) (string, error){
+func renameFunction(commands []string, kv_store *store) (string, error){
+	kv_store.mu.RLock()
+	defer kv_store.mu.RUnlock()
 	if len(commands) != 3{
 		Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 		return "", Err 
 	}
 
-	val , ok := kv_store[commands[1]]
+	val , ok := kv_store.kv_pair[commands[1]]
 	if !ok {
 		return "", ErrNokey
 	}
@@ -80,15 +90,19 @@ func renameFunction(commands []string, kv_store map[string]string) (string, erro
 	return val, nil 
 }
 
-func emptyFunction(commands []string, kv_store map[string]string) (int, error){
+func emptyFunction(commands []string, kv_store *store) (int, error){
+	kv_store.mu.RLock()
+	defer kv_store.mu.RUnlock()
 	if len(commands) != 1 {
 		Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
 		return 0, Err
 	}
-	return len(kv_store), nil 
+	return len(kv_store.kv_pair), nil 
 }
 
-func keysFunction(commands []string, kv_store map[string]string) ([]string, error) {
+func keysFunction(commands []string, kv_store *store) ([]string, error) {
+	kv_store.mu.RLock()
+	defer kv_store.mu.RUnlock()
 	matched_str := make([]string, 0)
 	if len(commands) != 2 {
 		Err := fmt.Errorf("%w for %s command",ErrNumberArguments, commands[0])
@@ -96,7 +110,7 @@ func keysFunction(commands []string, kv_store map[string]string) ([]string, erro
 	}
 
 	if strings.Count(commands[1], "*") == 0{
-		if key, ok := kv_store[commands[1]]; ok{
+		if key, ok := kv_store.kv_pair[commands[1]]; ok{
 			matched_str = append(matched_str, key)
 		}
 		return matched_str, nil 
@@ -109,7 +123,7 @@ func keysFunction(commands []string, kv_store map[string]string) ([]string, erro
 	}
 
 	regex_str = strings.ReplaceAll(regex_str, "*", "([a-z])")
-	keys := maps.Keys(kv_store)
+	keys := maps.Keys(kv_store.kv_pair)
 	for key := range keys{
 		match, err := regexp.Match(regex_str, []byte(key))
 		if err != nil{
@@ -135,6 +149,10 @@ func expireFunction (commands []string, kv_store *store) (error){
 		return Err 
 	}
 
+	if _, ok := kv_store.kv_pair[commands[1]]; !ok {
+		return ErrNokey
+	}
+	
 	if (commands[0] == "expire"){
 		go delayedDel(kv_store, commands[1], duration, Second)
 	}else{

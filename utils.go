@@ -34,8 +34,9 @@ func delayedDel(kv_store *store, key string, t int, tf TimeFormat) {
 	
 	<-ctx.Done()
 	kv_store.mu.Lock()
+	defer kv_store.mu.Unlock()
 	delete(kv_store.kv_pair, key)
-	kv_store.mu.Unlock()
+	
 }
 
 func takeInput(scanner *bufio.Scanner) ([]string, error){

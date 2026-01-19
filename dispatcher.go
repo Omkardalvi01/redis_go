@@ -25,13 +25,17 @@ func dispatcher(commands []string, mode Mode, kv_store *store, valid_append bool
 			break
 		}
 		r.resp = fmt.Sprintln("OK")
+		//data manipulation
+		kv_store.mu.Lock()
 		kv_store.kv_pair[commands[1]] = commands[2]
+		kv_store.mu.Unlock()
+
 		if valid_append{
 			r.err = Append(commands)
 		}
 	
 	case "get":
-		val, present, err := getFunction(commands, kv_store.kv_pair)
+		val, present, err := getFunction(commands, kv_store)
 		if err != nil {
 			r.err = err 
 			break
@@ -43,7 +47,7 @@ func dispatcher(commands []string, mode Mode, kv_store *store, valid_append bool
 		r.resp = fmt.Sprintln(val)
 	
 	case "del":
-		delKeys, err := deleteFunction(commands, kv_store.kv_pair)
+		delKeys, err := deleteFunction(commands, kv_store)
 		if err != nil && mode == FILE{
 			log.Fatalln(err)
 			break 
@@ -52,9 +56,12 @@ func dispatcher(commands []string, mode Mode, kv_store *store, valid_append bool
 			r.err = err 
 			break
 		}
+		
+		kv_store.mu.Lock()
 		for _, val := range delKeys {
 			delete(kv_store.kv_pair, val)
 		}
+		kv_store.mu.Unlock()
 
 		r.resp = fmt.Sprintf("(integer) %d\n", len(delKeys))
 		if valid_append{
@@ -62,7 +69,7 @@ func dispatcher(commands []string, mode Mode, kv_store *store, valid_append bool
 		}
 		
 	case "exist":
-		count, err := existFunction(commands, kv_store.kv_pair)
+		count, err := existFunction(commands, kv_store)
 		if err != nil {
 			r.err = err 
 			break
@@ -70,7 +77,7 @@ func dispatcher(commands []string, mode Mode, kv_store *store, valid_append bool
 		r.resp = fmt.Sprintf("(integer) %d\n", count)
 
 	case "rename":
-		val, err := renameFunction(commands, kv_store.kv_pair)
+		val, err := renameFunction(commands, kv_store)
 		if err != nil && mode == FILE{
 			log.Fatalln(err)
 			break 
@@ -79,9 +86,12 @@ func dispatcher(commands []string, mode Mode, kv_store *store, valid_append bool
 			r.err = err 
 			break
 		}
+		
+		kv_store.mu.Lock()
 		delete(kv_store.kv_pair, commands[1])
 		kv_store.kv_pair[commands[2]] = val 
-		
+		kv_store.mu.Unlock()
+
 		r.resp = fmt.Sprintln("OK")
 		if valid_append {
 			r.err = Append(commands)
@@ -89,7 +99,7 @@ func dispatcher(commands []string, mode Mode, kv_store *store, valid_append bool
 
 	
 	case "empty":
-		val, err := emptyFunction(commands, kv_store.kv_pair)
+		val, err := emptyFunction(commands, kv_store)
 		if err != nil {
 			r.err = err 
 			break
@@ -97,7 +107,7 @@ func dispatcher(commands []string, mode Mode, kv_store *store, valid_append bool
 		r.resp = fmt.Sprintf("(integer) %d\n", val)
 
 	case "keys":
-		matched_str, err := keysFunction(commands, kv_store.kv_pair)
+		matched_str, err := keysFunction(commands, kv_store)
 		if err != nil {
 			r.err = err 
 			break

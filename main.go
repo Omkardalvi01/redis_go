@@ -11,7 +11,7 @@ import (
 )
 
 type store struct{
-	mu sync.Mutex
+	mu sync.RWMutex
 	kv_pair map[string]string
 }
 var KV_store = store{}
